@@ -1,12 +1,11 @@
 <template>
-  <div class="vue-bs-wrapper" :style="style">
+  <!-- :style="style" -->
+  <div class="vue-bs-wrapper">
     <div ref="content" class="vue-bs-content">
-      <div class="placeholder" v-if="placeholderStyle" :style="placeholderStyle"></div>
       <slot></slot>
-      <loading class="pull-up-slot" v-if="pullUp && startPullUp"></loading>
+      <!-- <div class="pull-up-loading" v-if="pullUp && startPullUp">加载中</div> -->
     </div>
-
-    <div class="pull-down-slot" v-if="maybePullDown && pullDown && startPullDown">
+    <!-- <div class="pull-down-loading" v-if="maybePullDown && pullDown && startPullDown">
       <span class="iconfont icon-refresh icon"
         :class="{rotate: !downImgStyle && pullDowning}"
         :style="downImgStyle">
@@ -14,7 +13,7 @@
       <span class="text" v-show="!pullDowning">
         刷新成功
       </span>
-    </div>
+    </div> -->
   </div>
 </template>
 
@@ -31,72 +30,11 @@
     },
     data() {
       return {
-        style: null,
-        maybePullDown: false,
-        pullDowning: false,
-        downImgStyle: null,
-        startPullUp: false,
-        startPullDown: false,
-        placeholderStyle: null
+
       }
     },
     methods: {
-      resize: debounce(500, function () {
-        this.refresh()
-      }),
-      setStyle(obj) {
-        this.style = obj
-      },
-      scrollBy(x, y) {
-        // 只有向上滚动,或者是有向下滚动的距离的时候才滚动,没有距离了就不滚动了
-        if (y < 0 || y > 0 && this.bs.y < 0 && y < (-this.bs.y)) {
-          this.bs.scrollBy(x, y)
-          this.placeholderStyle = null
-          return true
-        } else {
-          // 这里如果顶部没有地方可以滚动了,就垫一个相同高度的元素再滚动
-          this.placeholderStyle = y ? {
-            height: y + 'px',
-            background: '#fff'
-          } : null
-          return false
-        }
-      },
-      // 下拉刷新后告诉组件已经完毕了，优化体验
-      finishPullDown() {
-        this.pullDowning = false;
-        this.downImgStyle = null;
-        setTimeout(() => {
-          this.bs.finishPullDown()
-          this.startPullDown = false
-        }, 500)
-      },
-      // 上拉加载后告诉组件已经完毕了，优化体验
-      finishPullUp() {
-        this.startPullUp = false
-        this.bs.finishPullUp()
-        console.log('finishPullUp')
-      },
-      // 数据有变化之后，要刷新
-      refresh() {
-        this.bs.refresh()
-      },
-      // 矫正滚动状态
-      correctScrollStatus: debounce(function () {
-        // 如果滚动结束后滚动条没消失,组件会以为还在滚动中,导致无法点击,则立即停止当前滚动过程
-        if (getStyle(this.scrollbar).opacity === '1') {
-          // 这个方法是在源码中找到的设置 pointer-event 样式的方法,因为 pointer-event 被设置为了 none 导致无法点击
-          this.bs.scroller.togglePointerEvents(true)
-        }
-
-        // 滚动完成后一段时间还存在 startPullDown 则强制重置,避免下拉刷新的内容显示出来
-        setTimeout(() => {
-          this.startPullDown = false
-        }, 500)
-      }, 500),
       init() {
-        let stop = 80
-
         this.bs = new BScroll(this.$el, {
           // 滚动回调触发方式，0：不触发 scroll；2：触摸中滑动时触发；3：滚动过程中任何时间都触发
           probeType: 3,
@@ -111,95 +49,24 @@
           },
           // 是否支持下拉刷新
           pullDownRefresh: this.pullDown ? {
-            stop
+            stop: 40
           } : false,
           // 是否支持上拉加载
           pullUpLoad: this.pullUp ? {
-            threshold: 20
+            threshold: 10
           } : false
         })
-        const hooks = this.bs.scroller.actionsHandler.hooks
 
         // 下拉加载
         if (this.pullDown) {
-          this.bs.on('pullingDown', event => {
-            this.downImgStyle = null
-            this.emitPullDown = true
+          this.bs.on('pullingDown', () => {
             this.$emit('pull-down')
           })
         }
-
-        hooks.on('beforeStart', event => {
-          this.maybePullDown = this.bs.y
-        })
-
-        hooks.on('move', event => {
-          // 如果开始触摸到滑动是向下滑，则被认为可能是要下拉刷新了
-          if (this.maybePullDown === 0 && this.bs.y > 0) {
-            this.maybePullDown = true
-          }
-
-          if (this.pullDown) {
-            // 如果手指向下滑动
-            if (this.bs.movingDirectionY < 0) {
-              this.startPullDown = true
-            }
-          }
-        })
-
-        this.bs.on('scroll', position => {
-          // 下拉时，如果开始触摸位置是顶部，才算作下拉刷新
-          if (this.pullDown && this.maybePullDown) {
-            if (position.y > 0) {
-              if (this.emitPullDown) {
-                this.downImgStyle = null
-                return
-              }
-
-              this.pullDowning = true
-              this.downImgStyle = {
-                top: `${position.y / 3}px`,
-                transform: `rotate(${position.y}deg)`
-              }
-            } else {
-              this.pullDowning = false
-              this.downImgStyle = null
-            }
-            this.$emit('scroll', position.y)
-          }
-
-          // 滚动后不断触发滚动状态校验
-          this.correctScrollStatus() 
-        })
-
-        this.bs.on('scrollEnd', () => {
-          if (this.pullDown) {
-            this.emitPullDown = false
-            this.startPullDown = false
-          }
-        })
-
-        // 上拉加载
-        if (this.pullUp) {
-          this.bs.on('pullingUp', event => {
-            this.startPullUp = true
-            console.log('pull-up')
-            this.$emit('pull-up')
-          })
-        }
-
-        addResizeListener(this.$refs.content, this.resize)
-
-        // 初始化完成后，触发一次刷新
-        this.$nextTick(() => {
-          this.scrollbar = this.bs.wrapper.querySelector('.bscroll-vertical-scrollbar')
-          this.refresh()
-        })
       }
     },
     beforeDestroy() {
-      removeResizeListener(this.$refs.content, this.resize)
-      this.bs.destroy()
+      
     },
     mounted() {
       this.init()
@@ -222,7 +89,7 @@
       }
     }
 
-    .pull-down-slot {
+    .pull-down-loading {
       position: absolute;
       top: 0;
       left: 0;
@@ -245,7 +112,7 @@
         }
       }
     }
-    .pull-up-slot {
+    .pull-up-loading {
       padding: 20px 0 !important;
       /deep/ .loading-icon {
         width: 60px !important;
