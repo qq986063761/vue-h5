@@ -3,13 +3,12 @@
 ```vue
 <template>
   <vue-bs
-    style="flex: 1;"
     ref="bs" 
     :pull-down="true"
     :pull-up="true"
     @pull-down="pullDown" 
     @pull-up="pullUp">
-    <div :style="style">
+    <div>
       很多内容很多内容很多内容
     </div>
   </vue-bs>
@@ -17,15 +16,9 @@
 
 <script>
   export default {
-    data () {
-      return {
-        style: 'height: 500px;background: skyblue;color: #000;',
-      }
-    },
     methods: {
       pullDown() {
         console.log('pullDown：这里要调用组件内部的 finishPullDown 方法结束下拉加载')
-        this.style = 'height: 5000px;background: skyblue;color: #000;'
         this.bs.finishPullDown()
       },
       pullUp() {
